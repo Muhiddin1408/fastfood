@@ -90,12 +90,6 @@ class MenuView(generics.ListAPIView):
     pagination_class = SmallPagesPagination
 
 
-class MenuCreateView(generics.CreateAPIView):
-    queryset = Menu.objects.all()
-    serializer_class = SerializerMenu
-    permission_classes = [IsAuthenticated]
-
-
 # Order
 
 
@@ -105,10 +99,7 @@ class OrderItemCreate(generics.CreateAPIView):
 
     def post(self, request, *args, **kwargs):
         try:
-            print(';;;;;;;;;;;;;;;;')
-            print(request.user.status)
             if request.user.status == 'user' or request.user.status == 'admin':
-                print('llllllllllllllll')
                 data = self.request.data
                 order = Order.objects.filter(user=request.user, status='basket').last()
                 if not order:
@@ -136,16 +127,11 @@ class ToOrder(generics.CreateAPIView):
         order = Order.objects.filter(user=request.user, status='basket').first()
         queue_count = OrderItem.objects.filter(order__status='wait', product__type='food').count()
         queue_count_self = OrderItem.objects.filter(order=order, product__type='food').count()
-        print(1 % 4)
 
-        if (queue_count+queue_count_self) % 4 == 0 or queue_count+queue_count_self <=4:
+        if (queue_count+queue_count_self) % 4 == 0 or queue_count+queue_count_self <= 4:
             time = ((queue_count+queue_count_self) % 4) * 5
-            print(time)
-
         else:
             time = (((queue_count+queue_count_self) % 4) + 1) * 5
-            print(time)
-
         lat1 = radians(69.287803)
         lon1 = radians(41.358240)
         lat2 = radians(data['lat'])
@@ -156,15 +142,11 @@ class ToOrder(generics.CreateAPIView):
         c = 2 * atan2(sqrt(a), sqrt(1 - a))
         r = 6371.0
         distance = r * c
-        print(distance)
-
         if distance % 1 == 0:
             d_time = distance * 3
         else:
             d_time = (distance + 1) * 3
-
         time = time + d_time
-
         order.lat = data['lat']
         order.lon = data['lon']
         order.payment_status = data['payment']
@@ -197,5 +179,29 @@ def order_status(request, pk):
             order.save()
         return Response(status=status.HTTP_200_OK)
     return Response(status=status.HTTP_400_BAD_REQUEST)
+
+
+# Admin
+
+
+class MenuCreateView(generics.CreateAPIView):
+    queryset = Menu.objects.all()
+    serializer_class = SerializerMenu
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        serializers = SerializerMenu(request.data)
+        if request.user.status == 'waiter' or request.user.status == 'admin' and serializers.is_valid():
+            serializers.save()
+            return Response(status=status.HTTP_201_CREATED)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated, ])
+def delete_menu(request, pk):
+    if request.user.status == 'waiter' or request.user.status == 'admin':
+        menu = Menu.objects.get(id=pk)
+        menu.delete()
+    return Response(status=status.HTTP_200_OK)
 
 
